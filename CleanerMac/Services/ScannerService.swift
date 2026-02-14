@@ -62,6 +62,8 @@ final class ScannerService {
             return await scaniOSBackups()
         case .trash:
             return await scanTrash()
+        case .messengerData:
+            return await scanMessengerData()
         }
     }
 
@@ -258,6 +260,7 @@ final class ScannerService {
             (CleaningPaths.cocoapodsCache, "CocoaPods Cache"),
             (CleaningPaths.gradleCache, "Gradle Cache"),
             (CleaningPaths.cargoCache, "Cargo Cache"),
+            (CleaningPaths.coreSimulatorSystem, "iOS Simulators (System)"),
         ]
 
         for (path, displayName) in singleItemPaths {
@@ -476,6 +479,34 @@ final class ScannerService {
                 size: size,
                 category: .trash,
                 modificationDate: modificationDate(of: entry)
+            ))
+        }
+
+        return items.sorted { $0.size > $1.size }
+    }
+
+    // MARK: - Messenger Data
+
+    private func scanMessengerData() async -> [ScannedItem] {
+        var items: [ScannedItem] = []
+
+        let messengerPaths: [(URL, String)] = [
+            (CleaningPaths.telegramCache, "Telegram Cache"),
+            (CleaningPaths.whatsappCache, "WhatsApp Cache"),
+            (CleaningPaths.discordCache, "Discord Cache"),
+            (CleaningPaths.slackCache, "Slack Cache"),
+        ]
+
+        for (path, displayName) in messengerPaths {
+            guard directoryExists(at: path), isSafePath(path) else { continue }
+            let size = FileSize.directorySize(at: path)
+            guard size > 0 else { continue }
+            items.append(ScannedItem(
+                path: path,
+                name: displayName,
+                size: size,
+                category: .messengerData,
+                modificationDate: modificationDate(of: path)
             ))
         }
 

@@ -125,6 +125,7 @@ struct CategoryCard: View {
         case .mailAttachments: return "Mail Attachments"
         case .iOSBackups: return "iOS Backups"
         case .trash: return "Trash"
+        case .messengerData: return "Messenger Data"
         }
     }
 

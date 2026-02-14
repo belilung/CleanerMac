@@ -174,6 +174,28 @@ enum CleaningPaths {
         ]
     }
 
+    // MARK: - Xcode Simulators (system-level)
+    static var coreSimulatorSystem: URL {
+        URL(fileURLWithPath: "/Library/Developer/CoreSimulator")
+    }
+
+    // MARK: - Messenger Caches
+    static var telegramCache: URL {
+        home.appendingPathComponent("Library/Group Containers/6N38VWS5BX.ru.keepcoder.Telegram")
+    }
+
+    static var whatsappCache: URL {
+        home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsApp.shared")
+    }
+
+    static var discordCache: URL {
+        home.appendingPathComponent("Library/Application Support/discord")
+    }
+
+    static var slackCache: URL {
+        home.appendingPathComponent("Library/Application Support/Slack")
+    }
+
     // MARK: - Never Delete (Safety)
     static var neverDelete: Set<String> {
         [

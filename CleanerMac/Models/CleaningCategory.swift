@@ -11,6 +11,7 @@ enum CleaningCategoryType: String, CaseIterable, Identifiable {
     case mailAttachments = "Mail Attachments"
     case iOSBackups = "iOS Backups"
     case trash = "Trash"
+    case messengerData = "Messenger Data"
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum CleaningCategoryType: String, CaseIterable, Identifiable {
         case .mailAttachments: return "paperclip"
         case .iOSBackups: return "iphone"
         case .trash: return "trash.fill"
+        case .messengerData: return "message.fill"
         }
     }
 
@@ -39,6 +41,7 @@ enum CleaningCategoryType: String, CaseIterable, Identifiable {
         case .mailAttachments: return .cyan
         case .iOSBackups: return .pink
         case .trash: return .gray
+        case .messengerData: return .indigo
         }
     }
 
@@ -47,12 +50,13 @@ enum CleaningCategoryType: String, CaseIterable, Identifiable {
         case .systemJunk: return "System caches, logs, crash reports, temporary files"
         case .userCache: return "Application caches in ~/Library/Caches"
         case .developerJunk: return "Xcode DerivedData, simulators, package manager caches"
-        case .largeFiles: return "Files larger than 100 MB"
+        case .largeFiles: return "Files larger than 50 MB"
         case .duplicates: return "Duplicate files wasting disk space"
         case .browserData: return "Browser caches, history, and cookies"
         case .mailAttachments: return "Downloaded email attachments"
         case .iOSBackups: return "Old iOS device backups"
         case .trash: return "Files in Trash"
+        case .messengerData: return "Telegram, WhatsApp, Discord, Slack cached data"
         }
     }
 
@@ -60,7 +64,7 @@ enum CleaningCategoryType: String, CaseIterable, Identifiable {
         switch self {
         case .systemJunk, .userCache, .trash: return .safe
         case .developerJunk, .mailAttachments: return .moderate
-        case .largeFiles, .duplicates, .browserData, .iOSBackups: return .caution
+        case .largeFiles, .duplicates, .browserData, .iOSBackups, .messengerData: return .caution
         }
     }
 }

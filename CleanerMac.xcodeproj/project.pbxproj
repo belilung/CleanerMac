@@ -472,13 +472,13 @@
 				INFOPLIST_FILE = CleanerMac/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CleanerMac;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 CleanerMac. All rights reserved.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2026 Andrii Bobniuk";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cleanermac.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.belilung.CleanerMac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -500,13 +500,13 @@
 				INFOPLIST_FILE = CleanerMac/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CleanerMac;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 CleanerMac. All rights reserved.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2026 Andrii Bobniuk";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cleanermac.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.belilung.CleanerMac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;

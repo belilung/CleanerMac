@@ -28,6 +28,11 @@ Package.resolved
 .agents/
 .claude/skills/
 
+# Distribution
+*.dmg
+*.pkg
+*.zip
+
 # Misc
 *.pbxuser
 !default.pbxuser

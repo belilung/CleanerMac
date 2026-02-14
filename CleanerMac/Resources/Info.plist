@@ -7,11 +7,11 @@
 	<key>CFBundleDisplayName</key>
 	<string>CleanerMac</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.cleanermac.app</string>
+	<string>com.belilung.CleanerMac</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundleShortVersionString</key>
 	<string>1.0.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>CFBundlePackageType</key>
@@ -19,6 +19,10 @@
 	<key>CFBundleExecutable</key>
 	<string>CleanerMac</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 CleanerMac. All rights reserved.</string>
+	<string>Copyright 2026 Andrii Bobniuk</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSUIElement</key>
+	<false/>
 </dict>
 </plist>
