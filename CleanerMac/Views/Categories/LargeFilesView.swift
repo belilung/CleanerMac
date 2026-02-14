@@ -1,5 +1,5 @@
 import SwiftUI
-import QuickLookUI
+import QuickLook
 
 struct LargeFilesView: View {
     @Environment(ScannerService.self) private var scannerService
@@ -319,9 +319,8 @@ struct LargeFilesView: View {
 
     private func revealInFinder(ids: Set<UUID>) {
         let urls = items.filter { ids.contains($0.id) }.map(\.path)
-        if let firstURL = urls.first {
-            NSWorkspace.shared.activateFileViewerSelecting(urls)
-        }
+        guard !urls.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
     private func performClean(permanent: Bool) {

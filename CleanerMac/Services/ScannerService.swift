@@ -1,6 +1,6 @@
 import Foundation
 
-@Observable
+@MainActor @Observable
 final class ScannerService {
     var scanResult = ScanResult()
     var isScanning = false
@@ -65,9 +65,8 @@ final class ScannerService {
         let protectedPaths = CleaningPaths.neverDelete
         let resolvedPath = url.standardizedFileURL.path
 
-        for protectedURL in protectedPaths {
-            let protectedPath = protectedURL.standardizedFileURL.path
-            if resolvedPath == protectedPath || resolvedPath.hasPrefix(protectedPath + "/") {
+        for protectedSubpath in protectedPaths {
+            if resolvedPath.contains(protectedSubpath) {
                 return false
             }
         }

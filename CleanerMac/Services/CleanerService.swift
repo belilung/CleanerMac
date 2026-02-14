@@ -1,6 +1,6 @@
 import Foundation
 
-@Observable
+@MainActor @Observable
 final class CleanerService {
     var isCleaning = false
     var progress: Double = 0

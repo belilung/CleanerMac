@@ -7,7 +7,7 @@ enum PermissionStatus {
     case unknown
 }
 
-final class PermissionManager {
+final class PermissionManager: Sendable {
     static let shared = PermissionManager()
 
     private init() {}

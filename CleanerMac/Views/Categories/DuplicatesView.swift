@@ -1,4 +1,5 @@
 import SwiftUI
+import QuickLook
 
 struct DuplicateGroup: Identifiable {
     let id = UUID()

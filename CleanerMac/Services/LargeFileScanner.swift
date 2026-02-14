@@ -1,6 +1,6 @@
 import Foundation
 
-@Observable
+@MainActor @Observable
 final class LargeFileScanner {
     var isScanning = false
     var progress: Double = 0
@@ -127,9 +127,8 @@ final class LargeFileScanner {
             let protectedPaths = CleaningPaths.neverDelete
             let resolvedPath = fileURL.standardizedFileURL.path
             var isProtected = false
-            for protectedURL in protectedPaths {
-                let protectedPath = protectedURL.standardizedFileURL.path
-                if resolvedPath == protectedPath || resolvedPath.hasPrefix(protectedPath + "/") {
+            for protectedSubpath in protectedPaths {
+                if resolvedPath.contains(protectedSubpath) {
                     isProtected = true
                     break
                 }

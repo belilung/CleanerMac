@@ -1,6 +1,6 @@
 import Foundation
 
-@Observable
+@MainActor @Observable
 final class DiskUsageService {
     var diskUsage: DiskUsage = DiskUsage.current()
 

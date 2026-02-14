@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-@Observable
+@MainActor @Observable
 final class DuplicateScanner {
     var isScanning = false
     var progress: Double = 0

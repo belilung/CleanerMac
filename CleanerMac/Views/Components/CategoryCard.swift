@@ -96,7 +96,7 @@ struct CategoryCard: View {
                 LinearGradient(
                     colors: [
                         category.color.opacity(isHovered ? 0.3 : 0.1),
-                        .separator.opacity(0.3)
+                        Color.gray.opacity(0.3)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
