@@ -54,7 +54,7 @@ struct LargeFilesView: View {
             isPresented: $showCleanConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Move to Trash", role: .destructive) {
+            Button("Move to Trash") {
                 performClean(permanent: false)
             }
             Button("Delete Permanently", role: .destructive) {
@@ -62,7 +62,7 @@ struct LargeFilesView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
+            Text("These files may include personal content. Please review before deleting.\n\nThis will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
         }
         .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
             Button("OK") { }

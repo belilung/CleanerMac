@@ -20,17 +20,26 @@ struct CategoryCard: View {
 
                 Spacer()
 
-                // Scanning indicator or item count
+                // Scanning indicator or item count + risk badge
                 if isScanning {
                     ProgressView()
                         .controlSize(.small)
-                } else if itemCount > 0 {
-                    Text("\(itemCount)")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.fill.tertiary, in: Capsule())
+                } else {
+                    HStack(spacing: 6) {
+                        if category.riskLevel != .safe {
+                            Image(systemName: category.riskLevel == .moderate ? "shield.fill" : "exclamationmark.shield.fill")
+                                .font(.caption2)
+                                .foregroundStyle(category.riskLevel.color)
+                        }
+                        if itemCount > 0 {
+                            Text("\(itemCount)")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(.fill.tertiary, in: Capsule())
+                        }
+                    }
                 }
             }
 

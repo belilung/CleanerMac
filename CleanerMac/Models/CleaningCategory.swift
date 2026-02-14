@@ -77,4 +77,30 @@ enum RiskLevel: String {
         case .caution: return .red
         }
     }
+
+    /// Whether items in this risk level should be auto-selected after scan
+    var autoSelect: Bool {
+        switch self {
+        case .safe: return true
+        case .moderate: return true
+        case .caution: return false
+        }
+    }
+
+    /// Whether cleaning requires extra confirmation
+    var requiresConfirmation: Bool {
+        switch self {
+        case .safe: return false
+        case .moderate: return false
+        case .caution: return true
+        }
+    }
+
+    var warningMessage: String? {
+        switch self {
+        case .safe: return nil
+        case .moderate: return nil
+        case .caution: return "These files may include personal content. Please review before deleting."
+        }
+    }
 }

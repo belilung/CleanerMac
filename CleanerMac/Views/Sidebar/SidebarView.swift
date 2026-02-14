@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selection: NavigationItem?
     @Environment(ScannerService.self) private var scannerService
+    @Environment(DiskUsageService.self) private var diskUsageService
 
     var body: some View {
         List(selection: $selection) {
@@ -44,6 +45,7 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
                 Divider()
+
                 if scannerService.isScanning {
                     HStack(spacing: 8) {
                         ProgressView()
@@ -58,14 +60,49 @@ struct SidebarView: View {
                             .monospacedDigit()
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 4)
                 }
+
+                // Disk usage mini-bar
+                diskUsageMiniBar
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
+        }
+    }
+
+    private var diskUsageMiniBar: some View {
+        let usage = diskUsageService.diskUsage
+        let usedRatio = usage.usedPercentage
+        let barColor: Color = usedRatio > 0.9 ? .red : usedRatio > 0.75 ? .orange : .blue
+
+        return VStack(spacing: 4) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.gray.opacity(0.2))
+
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(barColor)
+                        .frame(width: geo.size.width * usedRatio)
+                }
+            }
+            .frame(height: 6)
+
+            HStack {
+                Text("\(usage.formattedFree) free")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(usage.formattedTotal)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
     }
 
     private func scannedSize(for category: CleaningCategoryType) -> Int64? {
-        guard scannerService.scanResult.isComplete || !scannerService.isScanning else { return nil }
+        // Show sizes as soon as each category completes (even during scan)
         guard let items = scannerService.scanResult.items[category], !items.isEmpty else { return nil }
         return items.reduce(0) { $0 + $1.size }
     }
@@ -88,6 +125,11 @@ struct SidebarCategoryRow: View {
                     ProgressView()
                         .controlSize(.small)
                         .transition(.opacity)
+                } else if scannedSize != nil && scannedSize == 0 {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                        .transition(.scale.combined(with: .opacity))
                 } else if let size = scannedSize, size > 0 {
                     Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
                         .font(.caption)
@@ -128,4 +170,5 @@ private extension CleaningCategoryType {
 #Preview {
     SidebarView(selection: .constant(.dashboard))
         .environment(ScannerService())
+        .environment(DiskUsageService())
 }

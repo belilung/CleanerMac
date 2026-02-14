@@ -21,7 +21,13 @@ final class ScannerService {
 
         for category in categories.sorted(by: { $0.rawValue < $1.rawValue }) {
             currentCategory = category
-            let items = await scanCategory(category)
+            var items = await scanCategory(category)
+            // Auto-deselect risky categories — user must opt-in
+            if !category.riskLevel.autoSelect {
+                for i in items.indices {
+                    items[i].isSelected = false
+                }
+            }
             scanResult.items[category] = items
             completedCategories += 1
             progress = completedCategories / totalCategories

@@ -65,6 +65,10 @@ struct ScanResultsView: View {
             toolbarSection
             Divider()
 
+            if let warning = category.riskLevel.warningMessage, !items.isEmpty {
+                riskWarningBanner(message: warning)
+            }
+
             if items.isEmpty && !scannerService.isScanning {
                 emptyState
             } else {
@@ -80,7 +84,7 @@ struct ScanResultsView: View {
             isPresented: $showCleanConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Move to Trash", role: .destructive) {
+            Button("Move to Trash") {
                 performClean(permanent: false)
             }
             Button("Delete Permanently", role: .destructive) {
@@ -88,7 +92,11 @@ struct ScanResultsView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
+            if let warning = category.riskLevel.warningMessage {
+                Text("\(warning)\n\nThis will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
+            } else {
+                Text("This will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
+            }
         }
         .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
             Button("OK") { }
@@ -247,6 +255,23 @@ struct ScanResultsView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
+    }
+
+    // MARK: - Risk Warning Banner
+
+    private func riskWarningBanner(message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(12)
+        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
     }
 
     // MARK: - Actions

@@ -138,14 +138,12 @@ struct FileRowView: View {
     VStack(spacing: 0) {
         FileRowView(
             item: ScannedItem(
-                id: UUID(),
                 path: URL(fileURLWithPath: "/Users/demo/Documents/large-video.mp4"),
                 name: "large-video.mp4",
                 size: 1_500_000_000,
                 category: .largeFiles,
                 modificationDate: Date().addingTimeInterval(-86400 * 3),
-                isSelected: true,
-                formattedSize: "1.5 GB"
+                isSelected: true
             )
         )
 
@@ -153,14 +151,12 @@ struct FileRowView: View {
 
         FileRowView(
             item: ScannedItem(
-                id: UUID(),
                 path: URL(fileURLWithPath: "/Users/demo/Library/Caches/com.apple.Safari/data.cache"),
                 name: "data.cache",
                 size: 250_000_000,
                 category: .systemJunk,
                 modificationDate: Date().addingTimeInterval(-86400),
-                isSelected: false,
-                formattedSize: "250 MB"
+                isSelected: false
             )
         )
     }

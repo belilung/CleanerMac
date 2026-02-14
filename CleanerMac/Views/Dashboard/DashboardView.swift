@@ -16,24 +16,68 @@ struct DashboardView: View {
     private var scanResult: ScanResult { scannerService.scanResult }
     private var hasResults: Bool { scanResult.totalCount > 0 }
 
+    /// Items that are safe to clean (auto-selected, no personal data)
+    private var safeSelectedSize: Int64 {
+        scanResult.items
+            .filter { $0.key.riskLevel == .safe || $0.key.riskLevel == .moderate }
+            .values.flatMap { $0 }
+            .filter(\.isSelected)
+            .reduce(0) { $0 + $1.size }
+    }
+
+    private var safeSelectedCount: Int {
+        scanResult.items
+            .filter { $0.key.riskLevel == .safe || $0.key.riskLevel == .moderate }
+            .values.flatMap { $0 }
+            .filter(\.isSelected)
+            .count
+    }
+
+    /// Items that need review (large files, duplicates, etc.)
+    private var reviewItemsSize: Int64 {
+        scanResult.items
+            .filter { $0.key.riskLevel == .caution }
+            .values.flatMap { $0 }
+            .reduce(0) { $0 + $1.size }
+    }
+
+    private var reviewItemsCount: Int {
+        scanResult.items
+            .filter { $0.key.riskLevel == .caution }
+            .values.flatMap { $0 }
+            .count
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                heroSection
+        ZStack {
+            ScrollView {
+                VStack(spacing: 32) {
+                    heroSection
 
-                if hasResults && !scannerService.isScanning {
-                    resultsSummary
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+                    if hasResults && !scannerService.isScanning {
+                        cleaningSection
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
 
-                if hasResults || scannerService.isScanning {
-                    categoryGrid
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    if hasResults || scannerService.isScanning {
+                        categoryGrid
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
+                .padding(32)
             }
-            .padding(32)
+            .background(backgroundGradient)
+
+            // Floating scan progress bubble
+            if scannerService.isScanning {
+                VStack {
+                    Spacer()
+                    scanProgressBubble
+                        .padding(.bottom, 24)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
-        .background(backgroundGradient)
         .animation(.spring(duration: 0.6, bounce: 0.3), value: scannerService.isScanning)
         .animation(.spring(duration: 0.6, bounce: 0.3), value: hasResults)
         .onAppear {
@@ -44,106 +88,93 @@ struct DashboardView: View {
         .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
             Button("OK") { }
         } message: {
-            Text("Successfully cleaned \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file))")
+            Text("Freed \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file)) of disk space.")
         }
         .confirmationDialog(
-            "Clean \(scanResult.selectedCount) items?",
+            "Clean \(safeSelectedCount) safe items?",
             isPresented: $showCleanConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Move to Trash", role: .destructive) {
-                performClean(permanent: false)
+            Button("Move to Trash") {
+                performSafeClean(permanent: false)
             }
             Button("Delete Permanently", role: .destructive) {
-                performClean(permanent: true)
+                performSafeClean(permanent: true)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will free up \(ByteCountFormatter.string(fromByteCount: scanResult.selectedSize, countStyle: .file)) of space.")
+            Text("This will free up \(ByteCountFormatter.string(fromByteCount: safeSelectedSize, countStyle: .file)). Only safe items (caches, logs, temp files) will be cleaned.")
         }
+    }
+
+    // MARK: - Floating Scan Progress Bubble
+
+    private var scanProgressBubble: some View {
+        HStack(spacing: 16) {
+            // Animated progress ring
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 4)
+                    .frame(width: 44, height: 44)
+
+                Circle()
+                    .trim(from: 0, to: scannerService.progress)
+                    .stroke(
+                        LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
+                    .frame(width: 44, height: 44)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.3), value: scannerService.progress)
+
+                Text("\(Int(scannerService.progress * 100))%")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Scanning...")
+                    .font(.subheadline.weight(.semibold))
+
+                if let category = scannerService.currentCategory {
+                    Text(category.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            // Live size counter
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(ByteCountFormatter.string(fromByteCount: scanResult.totalSize, countStyle: .file))
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut, value: scanResult.totalSize)
+
+                Text("found")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .padding(.horizontal, 32)
     }
 
     // MARK: - Hero Section
 
     private var heroSection: some View {
         VStack(spacing: 24) {
-            ZStack {
-                DiskUsageChart(diskUsage: diskUsageService.diskUsage)
-                    .frame(width: 220, height: 220)
-                    .opacity(appearAnimation ? 1 : 0)
-                    .scaleEffect(appearAnimation ? 1 : 0.8)
+            DiskUsageChart(diskUsage: diskUsageService.diskUsage)
+                .frame(width: 220, height: 220)
+                .opacity(appearAnimation ? 1 : 0)
+                .scaleEffect(appearAnimation ? 1 : 0.8)
 
-                if scannerService.isScanning {
-                    scanningOverlay
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
-            }
-
-            actionButton
-        }
-        .padding(.top, 8)
-    }
-
-    private var scanningOverlay: some View {
-        VStack(spacing: 12) {
-            ProgressRing(
-                progress: scannerService.progress,
-                lineWidth: 6,
-                size: 100,
-                gradientColors: [.blue, .cyan]
-            ) {
-                VStack(spacing: 2) {
-                    Text("\(Int(scannerService.progress * 100))%")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                    if let category = scannerService.currentCategory {
-                        Text(categoryName(category))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-            }
-        }
-        .padding(24)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    private var actionButton: some View {
-        Group {
-            if scannerService.isScanning {
-                Button {
-                    // Cancel scanning if needed
-                } label: {
-                    Label("Scanning...", systemImage: "magnifyingglass")
-                        .font(.headline)
-                        .frame(width: 200, height: 44)
-                }
-                .buttonStyle(.bordered)
-                .disabled(true)
-            } else if hasResults {
-                HStack(spacing: 16) {
-                    Button {
-                        startScan()
-                    } label: {
-                        Label("Rescan", systemImage: "arrow.clockwise")
-                            .font(.subheadline.weight(.medium))
-                            .frame(height: 40)
-                            .padding(.horizontal, 16)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        showCleanConfirmation = true
-                    } label: {
-                        Label("Clean \(ByteCountFormatter.string(fromByteCount: scanResult.selectedSize, countStyle: .file))", systemImage: "trash")
-                            .font(.headline)
-                            .frame(width: 240, height: 44)
-                    }
-                    .buttonStyle(GradientButtonStyle(colors: [.red, .orange]))
-                    .disabled(scanResult.selectedCount == 0)
-                }
-            } else {
+            if !scannerService.isScanning && !hasResults {
                 Button {
                     startScan()
                 } label: {
@@ -153,36 +184,95 @@ struct DashboardView: View {
                 }
                 .buttonStyle(GradientButtonStyle(colors: [.blue, .cyan]))
                 .keyboardShortcut(.return, modifiers: .command)
+            } else if !scannerService.isScanning && hasResults {
+                Button {
+                    startScan()
+                } label: {
+                    Label("Rescan", systemImage: "arrow.clockwise")
+                        .font(.subheadline.weight(.medium))
+                        .frame(height: 36)
+                        .padding(.horizontal, 20)
+                }
+                .buttonStyle(.bordered)
             }
         }
-        .animation(.spring(duration: 0.5), value: scannerService.isScanning)
-        .animation(.spring(duration: 0.5), value: hasResults)
+        .padding(.top, 8)
     }
 
-    // MARK: - Results Summary
+    // MARK: - Cleaning Section (two-tier)
 
-    private var resultsSummary: some View {
-        HStack(spacing: 24) {
-            SummaryStatView(
-                title: "Total Junk Found",
-                value: ByteCountFormatter.string(fromByteCount: scanResult.totalSize, countStyle: .file),
-                icon: "externaldrive.fill",
-                color: .orange
-            )
+    private var cleaningSection: some View {
+        VStack(spacing: 20) {
+            // Results summary
+            HStack(spacing: 24) {
+                SummaryStatView(
+                    title: "Total Found",
+                    value: ByteCountFormatter.string(fromByteCount: scanResult.totalSize, countStyle: .file),
+                    icon: "externaldrive.fill",
+                    color: .orange
+                )
+                SummaryStatView(
+                    title: "Safe to Clean",
+                    value: ByteCountFormatter.string(fromByteCount: safeSelectedSize, countStyle: .file),
+                    icon: "checkmark.shield.fill",
+                    color: .green
+                )
+                SummaryStatView(
+                    title: "Needs Review",
+                    value: ByteCountFormatter.string(fromByteCount: reviewItemsSize, countStyle: .file),
+                    icon: "eye.fill",
+                    color: .orange
+                )
+            }
 
-            SummaryStatView(
-                title: "Items Found",
-                value: "\(scanResult.totalCount)",
-                icon: "doc.fill",
-                color: .blue
-            )
+            // Two-tier cleaning buttons
+            HStack(spacing: 16) {
+                // Safe clean button — primary action
+                Button {
+                    showCleanConfirmation = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield.fill")
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Clean Safe Items")
+                                .font(.subheadline.weight(.semibold))
+                            Text(ByteCountFormatter.string(fromByteCount: safeSelectedSize, countStyle: .file))
+                                .font(.caption)
+                                .opacity(0.8)
+                        }
+                    }
+                    .frame(height: 44)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(CleanButtonStyle(color: .blue))
+                .disabled(safeSelectedCount == 0)
 
-            SummaryStatView(
-                title: "Selected",
-                value: ByteCountFormatter.string(fromByteCount: scanResult.selectedSize, countStyle: .file),
-                icon: "checkmark.circle.fill",
-                color: .green
-            )
+                // Review button — secondary action
+                if reviewItemsCount > 0 {
+                    Button {
+                        // Navigate to first caution category with items
+                        if let first = CleaningCategoryType.allCases.first(where: {
+                            $0.riskLevel == .caution && (scanResult.items[$0]?.isEmpty == false)
+                        }) {
+                            navigateToCategory(first)
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "eye.fill")
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Review \(reviewItemsCount) Items")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(ByteCountFormatter.string(fromByteCount: reviewItemsSize, countStyle: .file))
+                                    .font(.caption)
+                                    .opacity(0.8)
+                            }
+                        }
+                        .frame(height: 44)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
         }
         .padding(.horizontal)
     }
@@ -244,14 +334,19 @@ struct DashboardView: View {
         }
     }
 
-    private func performClean(permanent: Bool) {
+    private func performSafeClean(permanent: Bool) {
         Task {
-            let allSelected = scanResult.items.values.flatMap { $0 }.filter(\.isSelected)
+            // Only clean items from safe/moderate categories
+            let safeItems = scanResult.items
+                .filter { $0.key.riskLevel == .safe || $0.key.riskLevel == .moderate }
+                .values.flatMap { $0 }
+                .filter(\.isSelected)
+
             let cleaned: Int64
             if permanent {
-                cleaned = await cleanerService.clean(items: allSelected)
+                cleaned = await cleanerService.clean(items: safeItems)
             } else {
-                cleaned = await cleanerService.moveToTrash(items: allSelected)
+                cleaned = await cleanerService.moveToTrash(items: safeItems)
             }
             cleanedAmount = cleaned
             showCleanedAlert = true
@@ -266,20 +361,6 @@ struct DashboardView: View {
 
     private func categoryItemCount(for category: CleaningCategoryType) -> Int {
         scanResult.items[category]?.count ?? 0
-    }
-
-    private func categoryName(_ category: CleaningCategoryType) -> String {
-        switch category {
-        case .systemJunk: return "System Junk"
-        case .userCache: return "User Cache"
-        case .developerJunk: return "Developer Junk"
-        case .largeFiles: return "Large Files"
-        case .duplicates: return "Duplicates"
-        case .browserData: return "Browser Data"
-        case .mailAttachments: return "Mail Attachments"
-        case .iOSBackups: return "iOS Backups"
-        case .trash: return "Trash"
-        }
     }
 }
 
@@ -310,6 +391,21 @@ struct SummaryStatView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Clean Button Style (solid red + white text)
+
+struct CleanButtonStyle: ButtonStyle {
+    let color: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+            .background(color.opacity(configuration.isPressed ? 0.8 : 1.0))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(duration: 0.2), value: configuration.isPressed)
     }
 }
 

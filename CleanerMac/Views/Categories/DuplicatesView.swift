@@ -66,7 +66,7 @@ struct DuplicatesView: View {
             isPresented: $showCleanConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Move to Trash", role: .destructive) {
+            Button("Move to Trash") {
                 performClean(permanent: false)
             }
             Button("Delete Permanently", role: .destructive) {
