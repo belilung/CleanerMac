@@ -18,8 +18,6 @@ struct DuplicatesView: View {
     @State private var expandedGroups: Set<UUID> = []
     @State private var searchText = ""
     @State private var showCleanConfirmation = false
-    @State private var showCleanedAlert = false
-    @State private var cleanedAmount: Int64 = 0
     @State private var previewURL: URL?
 
     private var items: [ScannedItem] {
@@ -75,11 +73,6 @@ struct DuplicatesView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
-        }
-        .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Successfully removed \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file)) of duplicates.")
         }
     }
 
@@ -313,14 +306,11 @@ struct DuplicatesView: View {
 
     private func performClean(permanent: Bool) {
         Task {
-            let cleaned: Int64
             if permanent {
-                cleaned = await cleanerService.clean(items: selectedItems)
+                _ = await cleanerService.clean(items: selectedItems)
             } else {
-                cleaned = await cleanerService.moveToTrash(items: selectedItems)
+                _ = await cleanerService.moveToTrash(items: selectedItems)
             }
-            cleanedAmount = cleaned
-            showCleanedAlert = true
         }
     }
 }

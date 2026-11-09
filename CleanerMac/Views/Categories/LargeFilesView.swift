@@ -10,8 +10,6 @@ struct LargeFilesView: View {
     @State private var sizeThreshold: Double = 50
     @State private var searchText = ""
     @State private var showCleanConfirmation = false
-    @State private var showCleanedAlert = false
-    @State private var cleanedAmount: Int64 = 0
     @State private var quickLookURL: URL?
 
     private var items: [ScannedItem] {
@@ -63,11 +61,6 @@ struct LargeFilesView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("These files may include personal content. Please review before deleting.\n\nThis will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
-        }
-        .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Successfully cleaned \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file))")
         }
     }
 
@@ -326,15 +319,12 @@ struct LargeFilesView: View {
     private func performClean(permanent: Bool) {
         Task {
             let toClean = selectedItems
-            let cleaned: Int64
             if permanent {
-                cleaned = await cleanerService.clean(items: toClean)
+                _ = await cleanerService.clean(items: toClean)
             } else {
-                cleaned = await cleanerService.moveToTrash(items: toClean)
+                _ = await cleanerService.moveToTrash(items: toClean)
             }
-            cleanedAmount = cleaned
             selectedItemIDs.removeAll()
-            showCleanedAlert = true
         }
     }
 }

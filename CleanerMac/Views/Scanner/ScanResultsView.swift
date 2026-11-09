@@ -10,8 +10,6 @@ struct ScanResultsView: View {
     @State private var sortAscending = false
     @State private var searchText = ""
     @State private var showCleanConfirmation = false
-    @State private var showCleanedAlert = false
-    @State private var cleanedAmount: Int64 = 0
 
     enum SortOrder: String, CaseIterable {
         case name = "Name"
@@ -97,11 +95,6 @@ struct ScanResultsView: View {
             } else {
                 Text("This will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
             }
-        }
-        .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Successfully cleaned \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file))")
         }
     }
 
@@ -297,14 +290,11 @@ struct ScanResultsView: View {
 
     private func performClean(permanent: Bool) {
         Task {
-            let cleaned: Int64
             if permanent {
-                cleaned = await cleanerService.clean(items: selectedItems)
+                _ = await cleanerService.clean(items: selectedItems)
             } else {
-                cleaned = await cleanerService.moveToTrash(items: selectedItems)
+                _ = await cleanerService.moveToTrash(items: selectedItems)
             }
-            cleanedAmount = cleaned
-            showCleanedAlert = true
         }
     }
 

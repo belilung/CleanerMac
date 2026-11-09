@@ -3,6 +3,8 @@ import SwiftUI
 enum NavigationItem: Hashable {
     case dashboard
     case category(CleaningCategoryType)
+    case appUninstaller
+    case startupItems
 }
 
 struct ContentView: View {
@@ -12,6 +14,9 @@ struct ContentView: View {
 
     @State private var selectedItem: NavigationItem? = .dashboard
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+
+    @AppStorage("scanOnLaunch") private var scanOnLaunch = false
+    @State private var hasAutoScanned = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -23,6 +28,12 @@ struct ContentView: View {
         .navigationSplitViewStyle(.balanced)
         .onAppear {
             diskUsageService.refresh()
+            if scanOnLaunch && !hasAutoScanned {
+                hasAutoScanned = true
+                Task {
+                    await scannerService.startScan(categories: Set(CleaningCategoryType.allCases))
+                }
+            }
         }
     }
 
@@ -37,6 +48,14 @@ struct ContentView: View {
 
         case .category(let categoryType):
             categoryDetailView(for: categoryType)
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+        case .appUninstaller:
+            AppUninstallerView()
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+        case .startupItems:
+            StartupItemsView()
                 .transition(.opacity.combined(with: .move(edge: .trailing)))
         }
     }
@@ -63,4 +82,6 @@ struct ContentView: View {
         .environment(ScannerService())
         .environment(CleanerService())
         .environment(DiskUsageService())
+        .environment(AppUninstallerService())
+        .environment(StartupItemsService())
 }

@@ -19,7 +19,7 @@ struct SidebarView: View {
             }
             .listItemTint(.blue)
 
-            Section("Categories") {
+            Section("Cleaning") {
                 ForEach(CleaningCategoryType.allCases, id: \.self) { category in
                     NavigationLink(value: NavigationItem.category(category)) {
                         SidebarCategoryRow(
@@ -27,6 +27,30 @@ struct SidebarView: View {
                             isScanning: scannerService.isScanning && scannerService.currentCategory == category,
                             scannedSize: scannedSize(for: category)
                         )
+                    }
+                }
+            }
+
+            Section("Tools") {
+                NavigationLink(value: NavigationItem.appUninstaller) {
+                    Label {
+                        Text("App Manager")
+                    } icon: {
+                        Image(systemName: "app.badge.checkmark")
+                            .foregroundStyle(.purple)
+                            .symbolRenderingMode(.hierarchical)
+                            .font(.system(size: 14))
+                    }
+                }
+
+                NavigationLink(value: NavigationItem.startupItems) {
+                    Label {
+                        Text("Startup Items")
+                    } icon: {
+                        Image(systemName: "bolt.circle.fill")
+                            .foregroundStyle(.orange)
+                            .symbolRenderingMode(.hierarchical)
+                            .font(.system(size: 14))
                     }
                 }
             }
@@ -50,10 +74,22 @@ struct SidebarView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Scanning...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Scanning...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let path = scannerService.currentPath {
+                                Text(path)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                            }
+                        }
+
                         Spacer()
+
                         Text("\(Int(scannerService.progress * 100))%")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -85,6 +121,7 @@ struct SidebarView: View {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(barColor)
                         .frame(width: geo.size.width * usedRatio)
+                        .animation(.spring(duration: 0.6), value: usedRatio)
                 }
             }
             .frame(height: 6)
@@ -102,7 +139,6 @@ struct SidebarView: View {
     }
 
     private func scannedSize(for category: CleaningCategoryType) -> Int64? {
-        // Show sizes as soon as each category completes (even during scan)
         guard let items = scannerService.scanResult.items[category], !items.isEmpty else { return nil }
         return items.reduce(0) { $0 + $1.size }
     }

@@ -77,8 +77,6 @@ struct PrivacyView: View {
 
     @State private var browserOptions: [BrowserCleanOption] = []
     @State private var showCleanConfirmation = false
-    @State private var showCleanedAlert = false
-    @State private var cleanedAmount: Int64 = 0
     @State private var hasInitialized = false
 
     private var installedBrowsers: [BrowserType] {
@@ -137,11 +135,6 @@ struct PrivacyView: View {
             } else {
                 Text("This will free up \(ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)).")
             }
-        }
-        .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Successfully cleaned \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file)) of browser data.")
         }
     }
 
@@ -340,9 +333,7 @@ struct PrivacyView: View {
     private func performClean() {
         Task {
             let allItems = scannerService.scanResult.items[.browserData] ?? []
-            let cleaned = await cleanerService.moveToTrash(items: allItems.filter(\.isSelected))
-            cleanedAmount = cleaned
-            showCleanedAlert = true
+            _ = await cleanerService.moveToTrash(items: allItems.filter(\.isSelected))
         }
     }
 }

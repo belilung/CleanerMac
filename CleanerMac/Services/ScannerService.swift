@@ -6,6 +6,8 @@ final class ScannerService {
     var isScanning = false
     var progress: Double = 0
     var currentCategory: CleaningCategoryType?
+    var currentPath: String?
+    var categoryProgress: Double = 0
 
     private let fileManager = FileManager.default
 
@@ -15,12 +17,14 @@ final class ScannerService {
         isScanning = true
         scanResult = ScanResult()
         progress = 0
+        categoryProgress = 0
         let startTime = Date()
         let totalCategories = Double(categories.count)
         var completedCategories = 0.0
 
         for category in categories.sorted(by: { $0.rawValue < $1.rawValue }) {
             currentCategory = category
+            categoryProgress = 0
             var items = await scanCategory(category)
             // Auto-deselect risky categories — user must opt-in
             if !category.riskLevel.autoSelect {
@@ -38,6 +42,8 @@ final class ScannerService {
         scanResult.isComplete = true
         isScanning = false
         currentCategory = nil
+        currentPath = nil
+        categoryProgress = 0
     }
 
     // MARK: - Category Router
@@ -115,53 +121,38 @@ final class ScannerService {
         )
     }
 
+    private func updateCurrentPath(_ url: URL) {
+        // Truncate home path for display
+        let home = CleaningPaths.home.path
+        let path = url.path
+        if path.hasPrefix(home) {
+            currentPath = "~" + path.dropFirst(home.count)
+        } else {
+            currentPath = path
+        }
+    }
+
     // MARK: - System Junk
 
     private func scanSystemJunk() async -> [ScannedItem] {
         var items: [ScannedItem] = []
+        let allPaths = CleaningPaths.systemCaches + CleaningPaths.systemLogs + CleaningPaths.crashReports + CleaningPaths.temporaryFiles
+        let totalPaths = Double(allPaths.count)
+        var processedPaths = 0.0
 
-        // Scan system caches
-        let systemCachePaths = CleaningPaths.systemCaches
-        for cacheDir in systemCachePaths {
-            let contents = topLevelContents(of: cacheDir)
+        // Scan system caches, logs, crash reports, temp files
+        for dir in allPaths {
+            updateCurrentPath(dir)
+            await Task.yield()
+
+            let contents = topLevelContents(of: dir)
             for entry in contents {
                 if let item = makeItem(path: entry, category: .systemJunk) {
                     items.append(item)
                 }
             }
-        }
-
-        // Scan system logs
-        let logPaths = CleaningPaths.systemLogs
-        for logDir in logPaths {
-            let contents = topLevelContents(of: logDir)
-            for entry in contents {
-                if let item = makeItem(path: entry, category: .systemJunk) {
-                    items.append(item)
-                }
-            }
-        }
-
-        // Scan crash reports
-        let crashPaths = CleaningPaths.crashReports
-        for crashDir in crashPaths {
-            let contents = topLevelContents(of: crashDir)
-            for entry in contents {
-                if let item = makeItem(path: entry, category: .systemJunk) {
-                    items.append(item)
-                }
-            }
-        }
-
-        // Scan temporary files
-        let tempPaths = CleaningPaths.temporaryFiles
-        for tempDir in tempPaths {
-            let contents = topLevelContents(of: tempDir)
-            for entry in contents {
-                if let item = makeItem(path: entry, category: .systemJunk) {
-                    items.append(item)
-                }
-            }
+            processedPaths += 1
+            categoryProgress = processedPaths / (totalPaths + 1)
         }
 
         // Find .DS_Store files in home directory
@@ -199,6 +190,7 @@ final class ScannerService {
                 }
             }
         }
+        categoryProgress = 1.0
 
         return items
     }
@@ -210,12 +202,19 @@ final class ScannerService {
 
         let cachesURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
         guard directoryExists(at: cachesURL) else { return items }
+        updateCurrentPath(cachesURL)
 
         let contents = topLevelContents(of: cachesURL)
-        for entry in contents {
+        let total = Double(contents.count)
+
+        for (index, entry) in contents.enumerated() {
+            await Task.yield()
+            updateCurrentPath(entry)
+
             if let item = makeItem(path: entry, category: .userCache) {
                 items.append(item)
             }
+            categoryProgress = Double(index + 1) / total
         }
 
         return items.sorted { $0.size > $1.size }
@@ -229,6 +228,7 @@ final class ScannerService {
         // Xcode paths - enumerate subdirectories where applicable
         let xcodeDerivedData = CleaningPaths.xcodeDerivedData
         if directoryExists(at: xcodeDerivedData) {
+            updateCurrentPath(xcodeDerivedData)
             let contents = topLevelContents(of: xcodeDerivedData)
             for entry in contents {
                 if let item = makeItem(path: entry, category: .developerJunk) {
@@ -239,6 +239,7 @@ final class ScannerService {
 
         let xcodeArchives = CleaningPaths.xcodeArchives
         if directoryExists(at: xcodeArchives) {
+            updateCurrentPath(xcodeArchives)
             let contents = topLevelContents(of: xcodeArchives)
             for entry in contents {
                 if let item = makeItem(path: entry, category: .developerJunk) {
@@ -246,6 +247,8 @@ final class ScannerService {
                 }
             }
         }
+
+        categoryProgress = 0.3
 
         // Single-item developer paths (each is one big item if it exists)
         let singleItemPaths: [(URL, String)] = [
@@ -263,10 +266,20 @@ final class ScannerService {
             (CleaningPaths.coreSimulatorSystem, "iOS Simulators (System)"),
         ]
 
-        for (path, displayName) in singleItemPaths {
-            guard directoryExists(at: path), isSafePath(path) else { continue }
+        let total = Double(singleItemPaths.count)
+        for (index, (path, displayName)) in singleItemPaths.enumerated() {
+            await Task.yield()
+            updateCurrentPath(path)
+
+            guard directoryExists(at: path), isSafePath(path) else {
+                categoryProgress = 0.3 + (Double(index + 1) / total) * 0.7
+                continue
+            }
             let size = FileSize.directorySize(at: path)
-            guard size > 0 else { continue }
+            guard size > 0 else {
+                categoryProgress = 0.3 + (Double(index + 1) / total) * 0.7
+                continue
+            }
             items.append(ScannedItem(
                 path: path,
                 name: displayName,
@@ -274,6 +287,7 @@ final class ScannerService {
                 category: .developerJunk,
                 modificationDate: modificationDate(of: path)
             ))
+            categoryProgress = 0.3 + (Double(index + 1) / total) * 0.7
         }
 
         return items.sorted { $0.size > $1.size }
@@ -295,12 +309,20 @@ final class ScannerService {
             return items
         }
 
+        var fileCount = 0
+        let maxResults = 100
+
         while let fileURL = enumerator.nextObject() as? URL {
             // Skip Library folder entirely to avoid system files
             let relativePath = fileURL.path.replacingOccurrences(of: homeURL.path, with: "")
             if relativePath.hasPrefix("/Library") {
                 enumerator.skipDescendants()
                 continue
+            }
+
+            if fileCount % 100 == 0 {
+                await Task.yield()
+                updateCurrentPath(fileURL)
             }
 
             // Only consider regular files
@@ -319,11 +341,15 @@ final class ScannerService {
                 category: .largeFiles,
                 modificationDate: resourceValues.contentModificationDate
             ))
+
+            fileCount += 1
+            categoryProgress = min(0.95, Double(fileCount) / Double(maxResults))
         }
 
         // Sort by size descending and limit to top 100
         items.sort { $0.size > $1.size }
-        return Array(items.prefix(100))
+        categoryProgress = 1.0
+        return Array(items.prefix(maxResults))
     }
 
     // MARK: - Browser Data
@@ -341,7 +367,7 @@ final class ScannerService {
             (CleaningPaths.arcCache, "Arc Cache"),
         ]
 
-        // Firefox profiles need special handling - enumerate profile directories
+        // Firefox profiles need special handling
         let firefoxProfilesDir = CleaningPaths.firefoxProfiles
         if directoryExists(at: firefoxProfilesDir) {
             let profiles = topLevelContents(of: firefoxProfilesDir)
@@ -365,11 +391,21 @@ final class ScannerService {
             }
         }
 
-        for (path, displayName) in browserPaths {
+        let total = Double(browserPaths.count)
+        for (index, (path, displayName)) in browserPaths.enumerated() {
+            await Task.yield()
+            updateCurrentPath(path)
+
             guard directoryExists(at: path) || FileSize.exists(at: path),
-                  isSafePath(path) else { continue }
+                  isSafePath(path) else {
+                categoryProgress = Double(index + 1) / total
+                continue
+            }
             let size = FileSize.directorySize(at: path)
-            guard size > 0 else { continue }
+            guard size > 0 else {
+                categoryProgress = Double(index + 1) / total
+                continue
+            }
             items.append(ScannedItem(
                 path: path,
                 name: displayName,
@@ -377,6 +413,7 @@ final class ScannerService {
                 category: .browserData,
                 modificationDate: modificationDate(of: path)
             ))
+            categoryProgress = Double(index + 1) / total
         }
 
         return items.sorted { $0.size > $1.size }
@@ -388,6 +425,7 @@ final class ScannerService {
         var items: [ScannedItem] = []
         let mailDir = CleaningPaths.mailAttachments
         guard directoryExists(at: mailDir) else { return items }
+        updateCurrentPath(mailDir)
 
         guard let enumerator = fileManager.enumerator(
             at: mailDir,
@@ -398,6 +436,7 @@ final class ScannerService {
             return items
         }
 
+        var fileCount = 0
         while let fileURL = enumerator.nextObject() as? URL {
             guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]),
                   resourceValues.isRegularFile == true else {
@@ -414,6 +453,12 @@ final class ScannerService {
                 category: .mailAttachments,
                 modificationDate: resourceValues.contentModificationDate
             ))
+            fileCount += 1
+
+            if fileCount % 50 == 0 {
+                await Task.yield()
+                updateCurrentPath(fileURL)
+            }
         }
 
         return items.sorted { $0.size > $1.size }
@@ -425,6 +470,7 @@ final class ScannerService {
         var items: [ScannedItem] = []
         let backupsDir = CleaningPaths.iOSBackups
         guard directoryExists(at: backupsDir) else { return items }
+        updateCurrentPath(backupsDir)
 
         let contents = topLevelContents(of: backupsDir)
         for entry in contents {
@@ -446,6 +492,7 @@ final class ScannerService {
         var items: [ScannedItem] = []
         let trashDir = CleaningPaths.userTrash
         guard directoryExists(at: trashDir) else { return items }
+        updateCurrentPath(trashDir)
 
         let contents: [URL]
         do {
@@ -497,10 +544,20 @@ final class ScannerService {
             (CleaningPaths.slackCache, "Slack Cache"),
         ]
 
-        for (path, displayName) in messengerPaths {
-            guard directoryExists(at: path), isSafePath(path) else { continue }
+        let total = Double(messengerPaths.count)
+        for (index, (path, displayName)) in messengerPaths.enumerated() {
+            await Task.yield()
+            updateCurrentPath(path)
+
+            guard directoryExists(at: path), isSafePath(path) else {
+                categoryProgress = Double(index + 1) / total
+                continue
+            }
             let size = FileSize.directorySize(at: path)
-            guard size > 0 else { continue }
+            guard size > 0 else {
+                categoryProgress = Double(index + 1) / total
+                continue
+            }
             items.append(ScannedItem(
                 path: path,
                 name: displayName,
@@ -508,6 +565,7 @@ final class ScannerService {
                 category: .messengerData,
                 modificationDate: modificationDate(of: path)
             ))
+            categoryProgress = Double(index + 1) / total
         }
 
         return items.sorted { $0.size > $1.size }

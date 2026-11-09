@@ -8,10 +8,12 @@ struct DashboardView: View {
     var navigateToCategory: (CleaningCategoryType) -> Void
 
     @State private var showCleanConfirmation = false
-    @State private var cleanedAmount: Int64 = 0
-    @State private var showCleanedAlert = false
     @State private var hoveredCategory: CleaningCategoryType?
     @State private var appearAnimation = false
+    @State private var hasFullDiskAccess = false
+    @State private var showFDABanner = true
+
+    @AppStorage("hasSeenFDAPrompt") private var hasSeenFDAPrompt = false
 
     private var scanResult: ScanResult { scannerService.scanResult }
     private var hasResults: Bool { scanResult.totalCount > 0 }
@@ -52,6 +54,12 @@ struct DashboardView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 32) {
+                    // FDA banner (non-blocking)
+                    if !hasFullDiskAccess && !hasSeenFDAPrompt && scanResult.isComplete {
+                        fdaBanner
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     heroSection
 
                     if hasResults && !scannerService.isScanning {
@@ -81,14 +89,14 @@ struct DashboardView: View {
         .animation(.spring(duration: 0.6, bounce: 0.3), value: scannerService.isScanning)
         .animation(.spring(duration: 0.6, bounce: 0.3), value: hasResults)
         .onAppear {
+            hasFullDiskAccess = PermissionManager.shared.checkFullDiskAccess()
             withAnimation(.easeOut(duration: 0.8)) {
                 appearAnimation = true
             }
         }
-        .alert("Cleaning Complete", isPresented: $showCleanedAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Freed \(ByteCountFormatter.string(fromByteCount: cleanedAmount, countStyle: .file)) of disk space.")
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // Re-check FDA when user returns from System Settings
+            hasFullDiskAccess = PermissionManager.shared.checkFullDiskAccess()
         }
         .confirmationDialog(
             "Clean \(safeSelectedCount) safe items?",
@@ -105,6 +113,49 @@ struct DashboardView: View {
         } message: {
             Text("This will free up \(ByteCountFormatter.string(fromByteCount: safeSelectedSize, countStyle: .file)). Only safe items (caches, logs, temp files) will be cleaned.")
         }
+    }
+
+    // MARK: - FDA Banner
+
+    private var fdaBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.shield.fill")
+                .font(.title3)
+                .foregroundStyle(.orange)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Limited Scan Results")
+                    .font(.subheadline.weight(.semibold))
+                Text("Grant Full Disk Access to scan all areas of your Mac.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button("Grant Access") {
+                PermissionManager.shared.requestFullDiskAccess()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            Button {
+                withAnimation {
+                    hasSeenFDAPrompt = true
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(16)
+        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.orange.opacity(0.2), lineWidth: 1)
+        )
     }
 
     // MARK: - Floating Scan Progress Bubble
@@ -140,6 +191,15 @@ struct DashboardView: View {
                     Text(category.rawValue)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                if let path = scannerService.currentPath {
+                    Text(path)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: 200, alignment: .leading)
                 }
             }
 
@@ -185,15 +245,23 @@ struct DashboardView: View {
                 .buttonStyle(GradientButtonStyle(colors: [.blue, .cyan]))
                 .keyboardShortcut(.return, modifiers: .command)
             } else if !scannerService.isScanning && hasResults {
-                Button {
-                    startScan()
-                } label: {
-                    Label("Rescan", systemImage: "arrow.clockwise")
-                        .font(.subheadline.weight(.medium))
-                        .frame(height: 36)
-                        .padding(.horizontal, 20)
+                HStack(spacing: 12) {
+                    Button {
+                        startScan()
+                    } label: {
+                        Label("Rescan", systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.medium))
+                            .frame(height: 36)
+                            .padding(.horizontal, 20)
+                    }
+                    .buttonStyle(.bordered)
+
+                    if scanResult.scanDuration > 0 {
+                        Text("Scanned in \(String(format: "%.1f", scanResult.scanDuration))s")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-                .buttonStyle(.bordered)
             }
         }
         .padding(.top, 8)
@@ -250,7 +318,6 @@ struct DashboardView: View {
                 // Review button — secondary action
                 if reviewItemsCount > 0 {
                     Button {
-                        // Navigate to first caution category with items
                         if let first = CleaningCategoryType.allCases.first(where: {
                             $0.riskLevel == .caution && (scanResult.items[$0]?.isEmpty == false)
                         }) {
@@ -336,20 +403,16 @@ struct DashboardView: View {
 
     private func performSafeClean(permanent: Bool) {
         Task {
-            // Only clean items from safe/moderate categories
             let safeItems = scanResult.items
                 .filter { $0.key.riskLevel == .safe || $0.key.riskLevel == .moderate }
                 .values.flatMap { $0 }
                 .filter(\.isSelected)
 
-            let cleaned: Int64
             if permanent {
-                cleaned = await cleanerService.clean(items: safeItems)
+                _ = await cleanerService.clean(items: safeItems)
             } else {
-                cleaned = await cleanerService.moveToTrash(items: safeItems)
+                _ = await cleanerService.moveToTrash(items: safeItems)
             }
-            cleanedAmount = cleaned
-            showCleanedAlert = true
             diskUsageService.refresh()
         }
     }
@@ -394,7 +457,7 @@ struct SummaryStatView: View {
     }
 }
 
-// MARK: - Clean Button Style (solid red + white text)
+// MARK: - Clean Button Style (solid + white text)
 
 struct CleanButtonStyle: ButtonStyle {
     let color: Color
